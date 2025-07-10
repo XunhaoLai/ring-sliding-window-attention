@@ -398,7 +398,7 @@ def ring_sliding_window_attn_varlen(
     ), "cu_seqlens does not match with sequence length per rank"
     if cp_size == 1:
         warnings.warn("[RingSWA] cp_size is 1, use flash_attn_varlen_func directly.")
-        max_seqlen = (cu_seqlens[1] - cu_seqlens[0]).item()
+        max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max().item()
         return flash_attn_varlen_func(
             q=q,
             k=k,
