@@ -1,5 +1,4 @@
 import math
-import warnings
 import torch
 from torch.distributed import ProcessGroup
 from typing import Optional
@@ -371,7 +370,6 @@ def ring_sliding_window_attn(
     # in this implementation, if you set window_size to w, then each query will attend to w + 1 tokens, include the current token
     # this is same as the one in flash attention
     if cp_size == 1:
-        warnings.warn("[RingSWA] cp_size is 1, use flash_attn_func directly.")
         return flash_attn_func(
             q=q,
             k=k,

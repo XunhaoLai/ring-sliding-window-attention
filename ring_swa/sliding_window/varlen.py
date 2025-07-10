@@ -1,6 +1,5 @@
 import math
 import torch
-import warnings
 from torch.distributed import ProcessGroup
 from typing import Optional
 from ring_swa.ops import (
@@ -397,7 +396,6 @@ def ring_sliding_window_attn_varlen(
         q.shape[0] == cu_seqlens[-1] // cp_size
     ), "cu_seqlens does not match with sequence length per rank"
     if cp_size == 1:
-        warnings.warn("[RingSWA] cp_size is 1, use flash_attn_varlen_func directly.")
         max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max().item()
         return flash_attn_varlen_func(
             q=q,
