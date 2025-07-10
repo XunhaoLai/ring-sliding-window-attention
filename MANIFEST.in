@@ -1,0 +1,21 @@
+include README.md
+include LICENSE
+include pyproject.toml
+include setup.py
+include .flake8
+include .pre-commit-config.yaml
+
+# Include all Python files in the package
+recursive-include ring_swa *.py
+
+# Include test files
+recursive-include test *.py
+
+# Exclude unnecessary files
+exclude .gitignore
+global-exclude __pycache__
+global-exclude *.py[cod]
+global-exclude *.so
+global-exclude .DS_Store
+global-exclude *.egg-info
+global-exclude .git* 

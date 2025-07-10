@@ -1,0 +1,115 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ring-sliding-window-attention"
+version = "0.1.0"
+description = "Ring attention implementation for sliding window attention"
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [
+    {name = "XunhaoLai", email = "laixunhao@pku.edu.cn"}
+]
+maintainers = [
+    {name = "XunhaoLai", email = "laixunhao@pku.edu.cn"}
+]
+keywords = ["attention", "sliding window", "ring attention", "flash attention", "transformer", "pytorch", "triton"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+requires-python = ">=3.8"
+dependencies = [
+    # Only lightweight essential dependencies
+    "packaging>=21.0",
+]
+
+[project.optional-dependencies]
+torch = [
+    "torch>=2.7.0",
+    "einops>=0.6.0",
+]
+flash = [
+    "flash-attn>=2.5.8",
+]
+full = [
+    "torch>=2.7.0",
+    "flash-attn>=2.5.8",
+    "einops>=0.6.0",
+    "packaging>=21.0",
+]
+dev = [
+    "pytest>=6.0",
+    "pytest-cov>=2.0",
+    "black>=22.0",
+    "flake8>=4.0",
+    "pre-commit>=2.0",
+    "torch>=2.7.0",
+    "flash-attn>=2.5.8",
+    "einops>=0.6.0",
+]
+test = [
+    "pytest>=6.0",
+    "pytest-cov>=2.0",
+    "torch>=2.7.0",
+    "flash-attn>=2.5.8",
+    "einops>=0.6.0",
+]
+triton = [
+    "triton>=3.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourorg/ring-sliding-window-attention"
+Repository = "https://github.com/yourorg/ring-sliding-window-attention"
+Documentation = "https://github.com/yourorg/ring-sliding-window-attention"
+"Bug Tracker" = "https://github.com/yourorg/ring-sliding-window-attention/issues"
+
+[tool.setuptools]
+packages = ["ring_swa"]
+
+[tool.setuptools.package-dir]
+ring_swa = "ring_swa"
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--verbose",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+] 
