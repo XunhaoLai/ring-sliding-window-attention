@@ -8,6 +8,7 @@ For a complete implementation details, please refer to our [documentation](docs/
 ## Features
 
   - **Ring Sliding Window Attention**: A distributed attention mechanism for sliding window attention.
+  - **Ring Streaming LLM Attention**: A distributed attention mechanism for sliding window attention with attention sink token.
   - **Variable Length Support**: Supports variable-length sequences, similar to `flash_attn_varlen_func`.
 
 ## Installation
@@ -108,6 +109,18 @@ output = ring_sliding_window_attn_varlen(
 print(f"[rank] {rank}, attention output shape: {output.shape}, norm: {output.norm()}")
 
 dist.destroy_process_group()
+```
+
+### Streaming LLM Attention
+
+The usage of `ring_streaming_llm_attn` and `ring_streaming_llm_attn_varlen` is similar to the standard ring sliding window attention functions. 
+The key difference is its use of an attention sink, a mechanism that forces every query in the sequence to attend to the first token.
+
+❗️**Note:** These functions currently assume that the first token for each sequence has identical content (e.g., a BOS token). Please ensure this condition is met before use.
+
+```python
+from ring_swa import ring_streaming_llm_attn
+from ring_swa import ring_streaming_llm_attn_varlen
 ```
 
 ## Testing

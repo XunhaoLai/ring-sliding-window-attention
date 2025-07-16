@@ -1,4 +1,9 @@
-from .comm import ring_attn_p2p_communicate
+from .comm import (
+    ring_attn_p2p_communicate,
+    broadcast_tensor_to_group,
+    reduce_sum_tesnsor_to_rank,
+    exchange_and_sum_tensors,
+)
 from .wrap_flash import (
     wrapped_flash_attn_fwd,
     wrapped_flash_attn_fwd_varlen,
@@ -16,6 +21,9 @@ from .merge import merge_attn_out
 
 __all__ = [
     "ring_attn_p2p_communicate",
+    "broadcast_tensor_to_group",
+    "reduce_sum_tesnsor_to_rank",
+    "exchange_and_sum_tensors",
     "wrapped_flash_attn_fwd",
     "wrapped_flash_attn_fwd_varlen",
     "wrapped_flash_attn_bwd",

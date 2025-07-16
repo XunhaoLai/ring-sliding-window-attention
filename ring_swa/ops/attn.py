@@ -18,7 +18,7 @@ def flash_attn_fwd_func(
     global_attn_out: torch.Tensor,
     global_softmax_lse: torch.Tensor,
 ):
-    if q.shape[1] <= kv.shape[2]:
+    if q.shape[1] <= kv.shape[2] or (not causal and window_size == (-1, -1)):
         # compute attention
         out, softmax_lse = wrapped_flash_attn_fwd(
             q=q,
@@ -72,7 +72,7 @@ def flash_attn_bwd_func(
     window_size: Tuple[int, int],
     causal: bool,
 ) -> None:
-    if q.shape[1] <= kv.shape[2]:
+    if q.shape[1] <= kv.shape[2] or (not causal and window_size == (-1, -1)):
         wrapped_flash_attn_bwd(
             q=q,
             k=kv[0],
