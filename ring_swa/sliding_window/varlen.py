@@ -8,6 +8,7 @@ from ring_swa.ops import (
     flash_attn_bwd_func,
     flash_attn_varlen_fwd_func,
     flash_attn_varlen_bwd_func,
+    get_group_local_to_global_rank_map,
 )
 from flash_attn import flash_attn_varlen_func
 
@@ -364,11 +365,11 @@ def ring_sliding_window_attn_varlen(
     v: torch.Tensor,
     window_size: int,
     cu_seqlens: torch.Tensor,
-    cp_group: ProcessGroup,
-    cp_size: int,
-    cp_local_rank: int,
-    cp_prev_global_rank: int,
-    cp_next_global_rank: int,
+    cp_group: Optional[ProcessGroup] = None,
+    cp_size: Optional[int] = None,
+    cp_local_rank: Optional[int] = None,
+    cp_prev_global_rank: Optional[int] = None,
+    cp_next_global_rank: Optional[int] = None,
     softmax_scale: Optional[float] = None,
 ) -> torch.Tensor:
     """
@@ -380,22 +381,27 @@ def ring_sliding_window_attn_varlen(
         v (torch.Tensor): Value tensor at current rank, shape [seq_len, num_kv_heads, head_dim].
         window_size (int): Window size, the number of tokens that each query will attend to, similar to window_size[0] in flash_attn.
         cu_seqlens (torch.Tensor): Cumulative sequence lengths of the whole batch across all ranks, shape [batch_size + 1].
-        cp_group (ProcessGroup): Process group for context parallelism.
-        cp_size (int): Number of ranks in the process group.
-        cp_local_rank (int): Local rank.
-        cp_prev_global_rank (int): Previous global rank.
-        cp_next_global_rank (int): Next global rank.
+        cp_group (ProcessGroup): Process group for context parallelism. If None, use single GPU version.
+        cp_size (Optional[int]): Number of ranks in the process group. If None, use torch.distributed.get_world_size(cp_group).
+        cp_local_rank (Optional[int]): Local rank in cp_group. If None, use torch.distributed.get_rank(group=cp_group).
+        cp_prev_global_rank (Optional[int]): Previous global rank. If None, will automatically compute the previous global rank from cp_group.
+        cp_next_global_rank (Optional[int]): Next global rank. If None, will automatically compute the next global rank from cp_group.
         softmax_scale (Optional[float], optional): Softmax scale. Defaults to None, which is head_dim ** (-0.5).
 
     Returns:
         torch.Tensor: Attention output at current rank, shape [seq_len, num_q_heads, head_dim]
+
+    Note:
+        If don't set cp_prev_global_rank, cp_next_global_rank, please make sure the data is split and placed in the correct rank.
+        You can use `rank_map = ring_swa.ops.get_group_local_to_global_rank_map(cp_group)` to get the rank map for the process group.
+        We assume that the i'th sequence chunk is placed in the global rank `rank_map[i]`.
     """
     # here cu_seqlens is the cumulative sequence lengths of all tokens, not only for current rank
     # so we need to broadcast cu_seqlens to all ranks before calling this function
     assert (
         q.shape[0] == cu_seqlens[-1] // cp_size
     ), "cu_seqlens does not match with sequence length per rank"
-    if cp_size == 1:
+    if cp_group is None:
         max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max().item()
         return flash_attn_varlen_func(
             q=q,
@@ -410,6 +416,14 @@ def ring_sliding_window_attn_varlen(
             causal=True,
         )
     else:
+        if cp_size is None:
+            cp_size = torch.distributed.get_world_size(cp_group)
+        if cp_local_rank is None:
+            cp_local_rank = torch.distributed.get_rank(group=cp_group)
+        if cp_prev_global_rank is None or cp_next_global_rank is None:
+            rank_map = get_group_local_to_global_rank_map(cp_group)
+            cp_prev_global_rank = rank_map[(cp_local_rank - 1 + cp_size) % cp_size]
+            cp_next_global_rank = rank_map[(cp_local_rank + 1) % cp_size]
         return RingSlidingWindowAttnVarlen.apply(
             q,
             k,

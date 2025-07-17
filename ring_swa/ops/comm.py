@@ -1,7 +1,8 @@
+import os
 import torch
 import torch.distributed as dist
 from torch.distributed import ProcessGroup, Work, ReduceOp
-from typing import List
+from typing import Dict, List, Tuple
 
 
 def ring_attn_p2p_communicate(
@@ -146,3 +147,86 @@ def exchange_and_sum_tensors(
     summed_tensor = torch.sum(torch.stack(output_list), dim=0)
 
     return summed_tensor
+
+
+class _RankMapManager:
+    """
+    A manager class to compute and cache mappings from a group-local rank
+    to a global rank for any given process group.
+
+    This class is intended for internal use. The public API is the
+    `get_group_local_to_global_rank_map` function.
+    """
+
+    def __init__(self):
+        # The cache is an instance variable, encapsulated within this class.
+        self._cache: Dict[Tuple[int, ...], Dict[int, int]] = {}
+
+    def get_map(self, group: dist.ProcessGroup) -> Dict[int, int]:
+        """
+        Retrieves the group-local to global rank map for the given group.
+        """
+        if group is None:
+            return {}
+
+        cache_key = tuple(dist.get_process_group_ranks(group))
+
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
+        rank_map = self._compute_map(group)
+        self._cache[cache_key] = rank_map
+        return rank_map
+
+    def _compute_map(self, group: dist.ProcessGroup) -> Dict[int, int]:
+        """
+        The core logic to compute the rank map using an all_gather collective.
+        """
+        global_rank = dist.get_rank()
+        group_local_rank = dist.get_rank(group=group)
+
+        node_local_rank = int(os.environ.get("LOCAL_RANK", 0))
+        device = torch.device("cpu")
+        if dist.get_backend() == "nccl":
+            device = torch.device(f"cuda:{node_local_rank}")
+
+        rank_pair_tensor = torch.tensor(
+            [group_local_rank, global_rank], dtype=torch.long, device=device
+        )
+
+        group_size = dist.get_world_size(group=group)
+        gathered_list = [torch.empty_like(rank_pair_tensor) for _ in range(group_size)]
+
+        dist.all_gather(gathered_list, rank_pair_tensor, group=group)
+
+        rank_map = {}
+        for pair_tensor in gathered_list:
+            g_l_rank, g_rank = pair_tensor.tolist()
+            rank_map[g_l_rank] = g_rank
+
+        return rank_map
+
+    def clear_cache(self):
+        """Clears the internal cache."""
+        self._cache.clear()
+        print("Rank map cache has been cleared.")
+
+
+_manager = _RankMapManager()
+
+
+def get_group_local_to_global_rank_map(group: dist.ProcessGroup) -> Dict[int, int]:
+    """
+    Retrieves the group-local to global rank map for the given group.
+
+    This function provides a simple, functional interface and uses a managed,
+    global cache to avoid re-computing the map for the same group. This method
+    must be called by all processes in the target group.
+
+    Args:
+        group (dist.ProcessGroup): The process group to get the map for.
+
+    Returns:
+        A dictionary mapping each group-local rank to its corresponding global rank.
+    """
+    return _manager.get_map(group)

@@ -3,6 +3,7 @@ from .comm import (
     broadcast_tensor_to_group,
     reduce_sum_tesnsor_to_rank,
     exchange_and_sum_tensors,
+    get_group_local_to_global_rank_map,
 )
 from .wrap_flash import (
     wrapped_flash_attn_fwd,
@@ -33,4 +34,5 @@ __all__ = [
     "flash_attn_varlen_fwd_func",
     "flash_attn_varlen_bwd_func",
     "merge_attn_out",
+    "get_group_local_to_global_rank_map",
 ]

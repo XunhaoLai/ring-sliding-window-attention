@@ -9,6 +9,7 @@ from ring_swa.ops import (
     flash_attn_fwd_func,
     flash_attn_bwd_func,
     merge_attn_out,
+    get_group_local_to_global_rank_map,
 )
 from .naive import naive_streaming_llm_attn
 
@@ -50,7 +51,8 @@ class RingStreamingLLMAttn(torch.autograd.Function):
         sink_kv[1].copy_(v[0, 0])
 
         # broadcast sink token to all ranks
-        broad_sink_req = broadcast_tensor_to_group(sink_kv, 0, cp_group)
+        rank_map = get_group_local_to_global_rank_map(cp_group)
+        broad_sink_req = broadcast_tensor_to_group(sink_kv, rank_map[0], cp_group)
 
         # communicate times
         ring_comm_times = math.ceil(window_size / seq_len)
@@ -383,7 +385,8 @@ class RingStreamingLLMAttn(torch.autograd.Function):
         )
         dq.add_(dq_local)
         sink_dkv = sink_dkv.to(torch.float32)
-        sink_dkv = reduce_sum_tesnsor_to_rank(sink_dkv, 0, cp_group)
+        rank_map = get_group_local_to_global_rank_map(cp_group)
+        sink_dkv = reduce_sum_tesnsor_to_rank(sink_dkv, rank_map[0], cp_group)
         if cp_local_rank == 0:
             dkv[:, :, :1].add_(sink_dkv)
 
@@ -399,11 +402,11 @@ def ring_streaming_llm_attn(
     k: torch.Tensor,
     v: torch.Tensor,
     window_size: int,
-    cp_group: ProcessGroup,
-    cp_size: int,
-    cp_local_rank: int,
-    cp_prev_global_rank: int,
-    cp_next_global_rank: int,
+    cp_group: Optional[ProcessGroup] = None,
+    cp_size: Optional[int] = None,
+    cp_local_rank: Optional[int] = None,
+    cp_prev_global_rank: Optional[int] = None,
+    cp_next_global_rank: Optional[int] = None,
     softmax_scale: Optional[float] = None,
 ):
     """
@@ -416,19 +419,24 @@ def ring_streaming_llm_attn(
         k (torch.Tensor): Key tensor at current rank, shape [batch_size, seq_len, num_kv_heads, head_dim].
         v (torch.Tensor): Value tensor at current rank, shape [batch_size, seq_len, num_kv_heads, head_dim].
         window_size (int): Window size, the number of tokens that each query will attend to, similar to window_size[0] in flash_attn.
-        cp_group (ProcessGroup): Process group for context parallelism.
-        cp_size (int): Number of ranks in the process group.
-        cp_local_rank (int): Local rank.
-        cp_prev_global_rank (int): Previous global rank.
-        cp_next_global_rank (int): Next global rank.
+        cp_group (ProcessGroup): Process group for context parallelism. If None, use single GPU version.
+        cp_size (Optional[int]): Number of ranks in the process group. If None, use torch.distributed.get_world_size(cp_group).
+        cp_local_rank (Optional[int]): Local rank in cp_group. If None, use torch.distributed.get_rank(group=cp_group).
+        cp_prev_global_rank (Optional[int]): Previous global rank. If None, will automatically compute the previous global rank from cp_group.
+        cp_next_global_rank (Optional[int]): Next global rank. If None, will automatically compute the next global rank from cp_group.
         softmax_scale (Optional[float], optional): Softmax scale. Defaults to None, which is head_dim ** (-0.5).
 
     Returns:
         torch.Tensor: Attention output at current rank, shape [seq_len, num_q_heads, head_dim]
+
+    Note:
+        If don't set cp_prev_global_rank, cp_next_global_rank, please make sure the data is split and placed in the correct rank.
+        You can use `rank_map = ring_swa.ops.get_group_local_to_global_rank_map(cp_group)` to get the rank map for the process group.
+        We assume that the i'th sequence chunk is placed in the global rank `rank_map[i % cp_size]`.
     """
     # in this implementation, if you set window_size to w, then each query will attend to w + 1 tokens, include the current token
     # this is same as the one in flash attention
-    if cp_size == 1:
+    if cp_group is None:
         return naive_streaming_llm_attn(
             q=q,
             k=k,
@@ -437,6 +445,14 @@ def ring_streaming_llm_attn(
             softmax_scale=softmax_scale,
         )
     else:
+        if cp_size is None:
+            cp_size = torch.distributed.get_world_size(cp_group)
+        if cp_local_rank is None:
+            cp_local_rank = torch.distributed.get_rank(group=cp_group)
+        if cp_prev_global_rank is None or cp_next_global_rank is None:
+            rank_map = get_group_local_to_global_rank_map(cp_group)
+            cp_prev_global_rank = rank_map[(cp_local_rank - 1 + cp_size) % cp_size]
+            cp_next_global_rank = rank_map[(cp_local_rank + 1) % cp_size]
         return RingStreamingLLMAttn.apply(
             q,
             k,
