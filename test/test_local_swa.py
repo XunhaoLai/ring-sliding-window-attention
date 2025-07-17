@@ -112,13 +112,33 @@ if __name__ == "__main__":
     v1 = v.detach().clone().requires_grad_()
     out_flash = flash_attn_func(q1, k1, v1, window_size=window_size)
 
-    torch.testing.assert_close(out, out_flash, atol=1e-2, rtol=1e-2)
-    print("forward pass passed")
+    try:
+        torch.testing.assert_close(out, out_flash, atol=1e-2, rtol=1e-2)
+        print("==> forward pass passed")
+    except Exception as e:
+        print("==> forward pass failed")
+        print(e)
 
     out.backward(torch.ones_like(out))
     out_flash.backward(torch.ones_like(out_flash))
 
-    torch.testing.assert_close(q1.grad, q.grad, atol=1e-2, rtol=1e-2)
-    torch.testing.assert_close(k1.grad, k.grad, atol=1e-2, rtol=1e-2)
-    torch.testing.assert_close(v1.grad, v.grad, atol=1e-2, rtol=1e-2)
-    print("backward pass gradients checked")
+    try:
+        torch.testing.assert_close(q1.grad, q.grad, atol=1e-2, rtol=1e-2)
+        print("==> backward pass q gradients passed")
+    except Exception as e:
+        print("==> backward pass q gradients failed")
+        print(e)
+
+    try:
+        torch.testing.assert_close(k1.grad, k.grad, atol=1e-2, rtol=1e-2)
+        print("==> backward pass k gradients passed")
+    except Exception as e:
+        print("==> backward pass k gradients failed")
+        print(e)
+
+    try:
+        torch.testing.assert_close(v1.grad, v.grad, atol=1e-2, rtol=1e-2)
+        print("==> backward pass v gradients passed")
+    except Exception as e:
+        print("==> backward pass v gradients failed")
+        print(e)

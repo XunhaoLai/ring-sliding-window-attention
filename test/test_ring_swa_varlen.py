@@ -469,7 +469,7 @@ def print_summary(results_list: list):
 
 
 if __name__ == "__main__":
-    # torchrun --nproc_per_node=4 test/test_ring_swa_varlen.py
+    # torchrun --nproc_per_node=8 test/test_ring_swa_varlen.py
     torch.manual_seed(42)
     setup_distributed()
     try:
@@ -482,10 +482,10 @@ if __name__ == "__main__":
             "dtype": torch.bfloat16,
         }
         test_seq_lens = [
-            (500, 2000, 4000, 16000),
-            (2000, 500, 4000, 16000),
-            (4000, 500, 2000, 16000),
-            (16000, 500, 2000, 4000),
+            (512, 2000, 4000, 16000),
+            (2000, 512, 4000, 16000),
+            (4000, 512, 2000, 16000),
+            (16000, 512, 2000, 4000),
         ]
         test_window_sizes = [1000, 4000, 8000]
         test_configs = [
