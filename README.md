@@ -29,9 +29,11 @@ pip install git+https://github.com/XunhaoLai/ring-sliding-window-attention.git
 
 ## Usage
 
+In ring sliding window attention, the query, key, and value tensors are split into cp_size chunks. Each chunk `i` is then placed on its corresponding rank `i` within the context parallel group. For simplicity, we'll use a random tensor in this example.
+
 ### Non-Varlen Example
 
-The input query, key, and value tensors should be chunked and scattered to each rank. Here, we use a random tensor as an example.
+The input query, key, and value tensors should be chunked and scattered to each rank.
 
 ```python
 import torch
