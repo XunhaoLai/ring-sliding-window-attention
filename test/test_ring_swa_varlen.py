@@ -293,15 +293,18 @@ def test_swa_varlen(config: dict):
     flash_timing = {}
     if rank == 0:
         (
-            q_chunks,
-            k_chunks,
-            v_chunks,
-            ref_o_chunks,
-            do_chunks,
-            ref_grad_q_chunks,
-            ref_grad_k_chunks,
-            ref_grad_v_chunks,
-        ), flash_timing = generate_data(
+            (
+                q_chunks,
+                k_chunks,
+                v_chunks,
+                ref_o_chunks,
+                do_chunks,
+                ref_grad_q_chunks,
+                ref_grad_k_chunks,
+                ref_grad_v_chunks,
+            ),
+            flash_timing,
+        ) = generate_data(
             cu_seqlens,
             max_seqlen,
             num_q_heads,

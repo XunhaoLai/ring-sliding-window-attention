@@ -6,6 +6,10 @@ exclude =
 ignore =
     # Whitespace before ‘,’, ‘;’, or ‘:’, it is not compatible with black
     E203,
+    # Multiple spaces before operator
+    E221,
+    # Missing whitespace after ‘:’
+    E231,
     # Module level import not at top of file
     E402,
     # Line too long (82 > 79 characters)

@@ -252,15 +252,18 @@ def test_swa_nonvarlen(config: dict):
     flash_timing = {}
     if rank == 0:
         (
-            q_chunks,
-            k_chunks,
-            v_chunks,
-            ref_o_chunks,
-            do_chunks,
-            ref_grad_q_chunks,
-            ref_grad_k_chunks,
-            ref_grad_v_chunks,
-        ), flash_timing = generate_data(
+            (
+                q_chunks,
+                k_chunks,
+                v_chunks,
+                ref_o_chunks,
+                do_chunks,
+                ref_grad_q_chunks,
+                ref_grad_k_chunks,
+                ref_grad_v_chunks,
+            ),
+            flash_timing,
+        ) = generate_data(
             seq_len, num_q_heads, num_kv_heads, head_dim, dtype, window_size, world_size
         )
     else:
