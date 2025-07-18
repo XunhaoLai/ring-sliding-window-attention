@@ -25,15 +25,34 @@ pip install git+https://github.com/XunhaoLai/ring-sliding-window-attention.git
   - torch \>= 2.7.0
   - flash\_attn \>= 2.5.8
   - einops \>= 0.6.0
-  - triton \>= 3.0.0 (Optional)
+  - triton \>= 3.0.0
 
 ## Usage
 
-In ring sliding window attention, the query, key, and value tensors are split into cp_size chunks. Each chunk `i` is then placed on its corresponding rank `i` within the context parallel group. For simplicity, we'll use a random tensor in this example.
+In ring sliding window attention, the query, key, and value tensors are split into cp_size chunks. Each chunk `i` is then placed on its corresponding rank `i` within the context parallel group. For simplicity, we'll use random tensors in following examples.
+
+### Function Arguments
+
+* `q`: The Query tensor.
+    * Shape (standard): `[batch_size, seq_len, num_q_heads, head_dim]`
+    * Shape (varlen): `[total_seq_len, num_q_heads, head_dim]`
+* `k`: The Key tensor.
+    * Shape (standard): `[batch_size, seq_len, num_kv_heads, head_dim]`
+    * Shape (varlen): `[total_seq_len, num_kv_heads, head_dim]`
+* `v`: The Value tensor, which has the same shape as the key tensor `k`.
+* `window_size`: The number of tokens that each query will attend to. This is similar to `window_size[0]` in flash_attn.
+* `cu_seqlens`: A tensor of cumulative sequence lengths for the entire batch across all ranks. Its shape is `[batch_size + 1]`. This is only required for the varlen version.
+* `cp_group`: The process group for context parallelism. If `None`, the function runs in a single-GPU mode.
+* `cp_local_rank`: The rank of the current process within its context parallel group.
+* `cp_prev_global_rank`: The global rank of the previous process in the ring.
+* `cp_next_global_rank`: The global rank of the next process in the ring.
+* `softmax_scale`: The scaling factor for the softmax function. It defaults to `1 / sqrt(head_dim)`.
+
+**Note on Ranks**: The rank arguments (`cp_local_rank`, `cp_prev_global_rank`, and `cp_next_global_rank`) are optional. If you don't provide them, they're computed automatically. First, the `cp_local_rank` is found using `torch.distributed.get_rank(group=cp_group)`. Then, a local-to-global rank mapping is used to determine the `cp_prev_global_rank` and `cp_next_global_rank`.
+You can get this mapping yourself with the following utility: `ring_swa.ops.get_group_local_to_global_rank_map(cp_group)`.
+
 
 ### Non-Varlen Example
-
-The input query, key, and value tensors should be chunked and scattered to each rank.
 
 ```python
 import torch
@@ -130,8 +149,10 @@ from ring_swa import ring_streaming_llm_attn_varlen
 You can run the test scripts to verify the correctness:
 
 ```bash
-torchrun --nproc_per_node=4 test/test_ring_swa_nonvarlen.py
-torchrun --nproc_per_node=4 test/test_ring_swa_varlen.py
+torchrun --nproc_per_node=8 test/test_ring_swa_nonvarlen.py
+torchrun --nproc_per_node=8 test/test_ring_swa_varlen.py
+torchrun --nproc_per_node=8 test/test_ring_slm_nonvarlen.py
+torchrun --nproc_per_node=8 test/test_ring_slm_varlen.py
 ```
 
 ## License
