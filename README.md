@@ -1,4 +1,10 @@
-# Ring Sliding Window Attention
+<h1 align="center">Ring Sliding Window Attention</h1>
+
+<div align="center">
+
+<img src="assets/main.png" alt="main" height="200" />
+
+</div>
 
 This repository provides a Ring Sliding Window Attention implementation for efficient long-sequence training with context parallelism.
 
@@ -10,6 +16,12 @@ For a complete implementation details, please refer to our [documentation](docs/
   - **Ring Sliding Window Attention**: A distributed attention mechanism for sliding window attention.
   - **Ring Streaming LLM Attention**: A distributed attention mechanism for sliding window attention with attention sink token.
   - **Variable Length Support**: Supports variable-length sequences, similar to `flash_attn_varlen_func`.
+
+<div align="center">
+
+<img src="assets/varlen.png" alt="varlen" height="200" />
+
+</div>
 
 ## Installation
 
