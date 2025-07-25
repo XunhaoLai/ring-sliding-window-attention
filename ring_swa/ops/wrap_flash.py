@@ -1,3 +1,5 @@
+import os
+
 import triton
 import triton.language as tl
 from packaging.version import parse as parse_version
@@ -8,6 +10,25 @@ from flash_attn.flash_attn_interface import (
     _flash_attn_varlen_forward,
     _flash_attn_varlen_backward,
 )
+
+try:
+    from flash_attn_interface import (
+        _flash_attn_forward as _flash_attn_3_forward,
+        _flash_attn_backward as _flash_attn_3_backward,
+    )
+
+    FLASH_ATTENTION_3 = os.getenv("FLASH_ATTENTION_3", "0") == "1"
+    if FLASH_ATTENTION_3:
+        print("[RingSWA] Flash Attention 3 is installed and enabled")
+    else:
+        print(
+            "[RingSWA] Flash Attention 3 is installed but not enabled, use Flash Attention 2"
+        )
+except Exception:
+    FLASH_ATTENTION_3 = False
+    _flash_attn_3_forward = None
+    _flash_attn_3_backward = None
+    print("[RingSWA] Flash Attention 3 is not installed, use Flash Attention 2")
 
 try:
     flash_attn_version = parse_version(version("flash-attn"))
@@ -46,6 +67,59 @@ kwargs_flash_attn_bwd_varlen = {
     "deterministic": False,
     "rng_state": None,
 }
+kwargs_flash_attn_3_fwd = {
+    "k_new": None,
+    "v_new": None,
+    "qv": None,
+    "out": None,
+    "cu_seqlens_q": None,
+    "cu_seqlens_k": None,
+    "cu_seqlens_k_new": None,
+    "seqused_q": None,
+    "seqused_k": None,
+    "max_seqlen_q": None,
+    "max_seqlen_k": None,
+    "page_table": None,
+    "kv_batch_idx": None,
+    "leftpad_k": None,
+    "rotary_cos": None,
+    "rotary_sin": None,
+    "seqlens_rotary": None,
+    "q_descale": None,
+    "k_descale": None,
+    "v_descale": None,
+}
+kwargs_flash_attn_3_bwd = {
+    "cu_seqlens_q": None,
+    "cu_seqlens_k": None,
+    "sequed_q": None,
+    "sequed_k": None,
+    "max_seqlen_q": None,
+    "max_seqlen_k": None,
+}
+kwargs_flash_attn_3_fwd_varlen = {
+    "k_new": None,
+    "v_new": None,
+    "qv": None,
+    "out": None,
+    "cu_seqlens_k_new": None,
+    "seqused_q": None,
+    "seqused_k": None,
+    "page_table": None,
+    "kv_batch_idx": None,
+    "leftpad_k": None,
+    "rotary_cos": None,
+    "rotary_sin": None,
+    "seqlens_rotary": None,
+    "q_descale": None,
+    "k_descale": None,
+    "v_descale": None,
+}
+kwargs_flash_attn_3_bwd_varlen = {
+    "sequed_q": None,
+    "sequed_k": None,
+}
+
 
 if flash_attn_version >= parse_version("2.6.0"):
     kwargs_flash_attn_fwd.update(
@@ -92,7 +166,17 @@ if flash_attn_version >= parse_version("2.7.4"):
 
 
 def wrapped_flash_attn_fwd(q, k, v, softmax_scale, window_size, causal):
-    if flash_attn_version < parse_version("2.7.0"):
+    if FLASH_ATTENTION_3:
+        out, softmax_lse, *rest = _flash_attn_3_forward(
+            q=q,
+            k=k,
+            v=v,
+            softmax_scale=softmax_scale,
+            causal=causal,
+            window_size=window_size,
+            **kwargs_flash_attn_3_fwd,
+        )
+    elif flash_attn_version < parse_version("2.7.0"):
         _, _, _, _, out, softmax_lse, _, _ = _flash_attn_forward(
             q=q,
             k=k,
@@ -102,7 +186,6 @@ def wrapped_flash_attn_fwd(q, k, v, softmax_scale, window_size, causal):
             window_size=window_size,
             **kwargs_flash_attn_fwd,
         )
-        return out, softmax_lse
     else:
         out, softmax_lse, _, _ = _flash_attn_forward(
             q=q,
@@ -114,7 +197,7 @@ def wrapped_flash_attn_fwd(q, k, v, softmax_scale, window_size, causal):
             window_size_right=window_size[1],
             **kwargs_flash_attn_fwd,
         )
-        return out, softmax_lse
+    return out, softmax_lse
 
 
 def wrapped_flash_attn_fwd_varlen(
@@ -129,7 +212,21 @@ def wrapped_flash_attn_fwd_varlen(
     max_seqlen_k,
     causal,
 ):
-    if flash_attn_version < parse_version("2.6.0"):
+    if FLASH_ATTENTION_3:
+        out, softmax_lse, *rest = _flash_attn_3_forward(
+            q=q,
+            k=k,
+            v=v,
+            cu_seqlens_q=cu_seqlens_q,
+            cu_seqlens_k=cu_seqlens_k,
+            max_seqlen_q=max_seqlen_q,
+            max_seqlen_k=max_seqlen_k,
+            softmax_scale=softmax_scale,
+            causal=causal,
+            window_size=window_size,
+            **kwargs_flash_attn_3_fwd_varlen,
+        )
+    elif flash_attn_version < parse_version("2.6.0"):
         _, _, _, _, out, softmax_lse, _, _ = _flash_attn_varlen_forward(
             q=q,
             k=k,
@@ -144,7 +241,6 @@ def wrapped_flash_attn_fwd_varlen(
             **kwargs_flash_attn_fwd_varlen,
         )
         softmax_lse = rmpad_softmax_lse(softmax_lse, cu_seqlens_q)
-        return out, softmax_lse
     elif flash_attn_version < parse_version("2.7.0"):
         _, _, _, _, out, softmax_lse, _, _ = _flash_attn_varlen_forward(
             q=q,
@@ -159,7 +255,6 @@ def wrapped_flash_attn_fwd_varlen(
             window_size=window_size,
             **kwargs_flash_attn_fwd_varlen,
         )
-        return out, softmax_lse
     else:
         out, softmax_lse, _, _ = _flash_attn_varlen_forward(
             q=q,
@@ -175,13 +270,29 @@ def wrapped_flash_attn_fwd_varlen(
             window_size_right=window_size[1],
             **kwargs_flash_attn_fwd_varlen,
         )
-        return out, softmax_lse
+    return out, softmax_lse
 
 
 def wrapped_flash_attn_bwd(
     q, k, v, o, softmax_lse, do, dq, dk, dv, softmax_scale, window_size, causal
 ):
-    if flash_attn_version < parse_version("2.7.0"):
+    if FLASH_ATTENTION_3:
+        _flash_attn_3_backward(
+            dout=do,
+            q=q,
+            k=k,
+            v=v,
+            out=o,
+            softmax_lse=softmax_lse,
+            dq=dq,
+            dk=dk,
+            dv=dv,
+            softmax_scale=softmax_scale,
+            causal=causal,
+            window_size=window_size,
+            **kwargs_flash_attn_3_bwd,
+        )
+    elif flash_attn_version < parse_version("2.7.0"):
         _flash_attn_backward(
             dout=do,
             q=q,
@@ -234,7 +345,27 @@ def wrapped_flash_attn_bwd_varlen(
     max_seqlen_k,
     causal,
 ):
-    if flash_attn_version < parse_version("2.6.0"):
+    if FLASH_ATTENTION_3:
+        _flash_attn_3_backward(
+            dout=do,
+            q=q,
+            k=k,
+            v=v,
+            out=o,
+            softmax_lse=softmax_lse,
+            dq=dq,
+            dk=dk,
+            dv=dv,
+            cu_seqlens_q=cu_seqlens_q,
+            cu_seqlens_k=cu_seqlens_k,
+            max_seqlen_q=max_seqlen_q,
+            max_seqlen_k=max_seqlen_k,
+            softmax_scale=softmax_scale,
+            causal=causal,
+            window_size=window_size,
+            **kwargs_flash_attn_3_bwd_varlen,
+        )
+    elif flash_attn_version < parse_version("2.6.0"):
         softmax_lse = pad_softmax_lse(softmax_lse, cu_seqlens_q)
         _flash_attn_varlen_backward(
             dout=do,
