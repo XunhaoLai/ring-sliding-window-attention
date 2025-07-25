@@ -573,7 +573,7 @@ def _pad_softmax_lse_kernel(
 
 def pad_softmax_lse(softmax_lse, cu_seqlens):
     num_heads, total_seqlen = softmax_lse.shape
-    max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max().item()
+    max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max()
     batch_size = cu_seqlens.shape[0] - 1
     if batch_size == 1:
         return softmax_lse.unsqueeze(0)

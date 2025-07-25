@@ -100,9 +100,7 @@ class StreamingLLMAttnVarlen(torch.autograd.Function):
     ):
         cu_seqlens_no_sink = cu_seqlens.repeat_interleave(2, dim=0)[:-1]
         cu_seqlens_no_sink[1::2] += 1
-        max_seqlen_no_sink = (
-            (cu_seqlens_no_sink[1:] - cu_seqlens_no_sink[:-1]).max().item()
-        )
+        max_seqlen_no_sink = (cu_seqlens_no_sink[1:] - cu_seqlens_no_sink[:-1]).max()
         o, lse = wrapped_flash_attn_fwd_varlen(
             q,
             k,
@@ -136,7 +134,7 @@ class StreamingLLMAttnVarlen(torch.autograd.Function):
         ctx.softmax_scale = softmax_scale
         ctx.window_size = window_size
         ctx.max_seqlen_no_sink = max_seqlen_no_sink
-        ctx.max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max().item()
+        ctx.max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max()
         return o
 
     @staticmethod

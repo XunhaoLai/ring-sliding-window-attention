@@ -68,10 +68,10 @@ class RingSlidingWindowAttnVarlen(torch.autograd.Function):
             ],
             dim=0,
         )
-        local_max_len = (local_cu_seqlens[1:] - local_cu_seqlens[:-1]).max().item()
+        local_max_len = (local_cu_seqlens[1:] - local_cu_seqlens[:-1]).max()
         # compute first sequence's length for non-diag block
-        first_q_len = local_cu_seqlens[1].item()
-        first_kv_len = cp_local_rank * seq_len - cu_seqlens[first_seq_id - 1].item()
+        first_q_len = local_cu_seqlens[1]
+        first_kv_len = cp_local_rank * seq_len - cu_seqlens[first_seq_id - 1]
         # print(f"[forward] rank: {cp_local_rank}, first_q_len: {first_q_len}, first_kv_len: {first_kv_len}")
 
         # communicate times
@@ -402,7 +402,7 @@ def ring_sliding_window_attn_varlen(
         q.shape[0] == cu_seqlens[-1] // cp_size
     ), "cu_seqlens does not match with sequence length per rank"
     if cp_group is None:
-        max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max().item()
+        max_seqlen = (cu_seqlens[1:] - cu_seqlens[:-1]).max()
         return flash_attn_varlen_func(
             q=q,
             k=k,

@@ -78,10 +78,10 @@ class RingStreamingLLMVarlen(torch.autograd.Function):
             ],
             dim=0,
         )
-        local_max_len = (local_cu_seqlens[1:] - local_cu_seqlens[:-1]).max().item()
+        local_max_len = (local_cu_seqlens[1:] - local_cu_seqlens[:-1]).max()
 
         # which rank is the first sink token in this rank need to go to
-        sink_token_send_rank = cu_seqlens[first_seq_id - 1].item() // seq_len
+        sink_token_send_rank = cu_seqlens[first_seq_id - 1] // seq_len
 
         # re-generate local_cu_seqlens without sink token
         cu_seqlens_no_sink = cu_seqlens.repeat_interleave(2, dim=0)[:-1]
@@ -100,14 +100,12 @@ class RingStreamingLLMVarlen(torch.autograd.Function):
             dim=0,
         )
         local_max_len_no_sink = (
-            (local_cu_seqlens_no_sink[1:] - local_cu_seqlens_no_sink[:-1]).max().item()
-        )
+            local_cu_seqlens_no_sink[1:] - local_cu_seqlens_no_sink[:-1]
+        ).max()
 
         # compute first sequence's length for non-diag block
-        first_q_len = local_cu_seqlens_no_sink[1].item()
-        first_kv_len = (
-            cp_local_rank * seq_len - cu_seqlens_no_sink[first_seq_id - 1].item()
-        )
+        first_q_len = local_cu_seqlens_no_sink[1]
+        first_kv_len = cp_local_rank * seq_len - cu_seqlens_no_sink[first_seq_id - 1]
 
         # communicate times
         ring_comm_times = math.ceil(window_size / seq_len)
